@@ -1543,8 +1543,222 @@ xxx@xx.XX
 [root@centos6 tmp]# grep -E '[a-z0-9]+@[a-z0-9]+\.[a-z]+' /var/log/maillog  --color
 邮箱的匹配
 
+2017/04/20  sed和awk
+sed 流编辑器   vim 属于屏幕编辑器
+sed 优点:一边编辑一边调用，节省内存
+sed在编辑时，首先把文档中的一行读入内存，这行内容我们是可以编辑的，这个内存的行叫模式空间。编辑完成后，这行会输出到屏幕，同时清空模式空间的内容，然后读入下一行，重复
+这种修改默认模式下是不会修改源文件内容的
 
-test
+sed ‘range command’ filename
+[root@centos6 tmp]# sed '1d' passwd  |more 
+删除文档passwd中的第一行内容。d是指令，表示删除
+[root@centos6 tmp]# sed 'd' xx.txt   删除所有内容
+[root@centos6 tmp]# sed 's/tom/TOM/g' xx.txt 
+使用s指令表示在文档中搜索并替代
+[root@centos6 tmp]# sed 's/tom/xxxx/2' xx.txt 
+针对tom内容进行标记，替换模式空间中的第二个tom内容，替换为xxxx
+[root@centos6 tmp]# sed '1s/ /--/2' bb  将文档中的第二个空格修改为--。
+[root@centos6 tmp]# sed 's/linux/-&-/1' bb  &符号表示引用前面的关键词，这里会将所有行中第一个linux变为-linux-
+[root@centos6 tmp]# sed '{s/linux/Linux/;s/Linux/rhel7/g}' bb
+如果对模式空间中的内容进行对次指令的调用，要用{;}格式
+[root@centos6 tmp]# sed 'y/id/12/' bb  针对单个字符的修改，不需要添加g，将所有的i变为1，所有的d变为2
+[root@centos6 tmp]# sed '/USERCTL/a\IPADDR\=192.168.1.1' ifcfg-eth0   a表示追加，在关键词的后面添加新的内容。这里是在userctl行后添加新的内容。a是往下添加，i是往上添加
+[root@centos6 tmp]# sed '/ONBOOT/c\ONBOOT=no' ifcfg-eth0 
+直接使用c来修改某一行内容
+[root@centos6 tmp]# sed -i '/BOOT/a\ONBOOT=yes' ifcfg-eth0 
+使用参数-i表示直接在源文件中进行修改
+[root@centos6 tmp]# sed '/^BOOT/{=}' ifcfg-eth0 
+定义关键词属于哪一行，{=} 指定行号
+[root@centos6 tmp]# sed '/^BOOT/{n;s/yes/no/}' ifcfg-eth0 
+n表示读取下一行，首先找出^BOOT内容行，然后读取下一行修改
+
+注：N表示多行模式空间，会读取模式空间的行后继续读取，并且不删除当前空间的行，如果使用N，^不再表示行的开头，$不再表示结尾，它们分别表示模式空间的开头和结束
+
+sed除了模式空间以外，还有一个保持空间的概念，其实就是缓存。使用模式空间时，创建一个副本，如果对模式空间操作，保持空间中的内容可以和模式空间互换
+
+awk  主要用来对文档进行排版，使用非常灵活，是shell脚本的又一个利器。
+cut -d： -f  4 /etc/passwd
+$0(当前行)  $1 $2 
+语法： awk ‘{range，command；command2}’  filename
+
+[root@centos6 tmp]# awk -F: '/^jarry/{ print $3 }' passwd 
+501
+[root@centos6 tmp]# awk -F: '$1~/jarry/{ print $3 }' passwd 
+
+[root@centos6 tmp]# awk 'BEGIN{FS=":"}$1~/jarry/{ print $1,$7}' passwd  
+
+2017/4/23  shell脚本
+./xx.sh   打开一个子shell执行脚本
+bash xx.sh    打开一个子shell执行脚本
+source xx.sh    在当前的shell中执行
+
+数值的比较
+中文              单词             字符
+等于              -eq               ==
+大于              -gt                >
+大于等于          -ge               >=
+小于              -lt                <
+小于等于          -le               <=
+不等于            ！-eq             !==
+判断1：test
+[root@centos7 tmp]# aa=5
+[root@centos7 tmp]# bb=15
+[root@centos7 tmp]# test ${aa} -lt ${bb}
+[root@centos7 tmp]# echo $?
+判断2：[ ]
+[ -f ]  判断文件是否存在
+[ -d ]  判断目录是否存在
+[ -r|w|x ] 判断读写执行权限
+[ -z ] 判断字符是否存在
+
+条件判断
+1、简单条件判断
+if  ； then
+fi
+2、一个条件判断，分成功和失败分别执行
+if  ； then
+else
+fi
+3、多条件判断
+if  ； then 
+elif  ；then
+else 
+4、case....esac
+case  变量  in
+      值1）
+	  命令；；
+	  值2）
+	  命令；；
+esac
+
+函数 function
+alias rm=“/tmp/sh”
+
+循环  while
+while  判断（满足）
+ do
+    XXX
+ done 
+实例：  
+  1 #!/bin/bash
+  2 nu=0
+  3 while [ ${nu} -lt 10 ] 
+  4 do
+  5         let nu++
+  6         echo ${nu}
+  7 done
+
+until不定循环（不满足条件循环）
+
+练习：
+写一个脚本统计目录中的文件数量
+写一个批量创建用户的脚本
+写一个统计系统中普通用户数量的脚本
+写一个脚本，判断系统中有哪些端口被开放
+
+远程系统管理与备份            
+ssh的使用
+telnet rlogin ssh ssh2
+[root@centos7 tmp]#ssh root@c6 
+[root@centos7 tmp]# scp xx.sh root@c6:~   远程拷贝
+rsync一般用于备份
+
+1、出于安全考虑，实际工作中很少使用账号密码（基于口令的认证）的方式登录ssh，更多的是通过密钥的方式
+2、更改ssh的默认端口
+3、禁止root登录
+
+A----B
+基于口令的认证：用户名 密码（短语）
+A希望和B连接，B发送公钥给A，A用B的公钥加密登录B的密码，B通过私钥验证A的信息，成功就可以放行
+基于密钥的认证：创建公钥和私钥
+A和B事先已经通过安全的方式获取对方的公钥，并且存放在本地。A希望和B建立连接， B会随机产生一个数字然后用A的公钥加密，再把这个信息发送给A，对比一致性。
+
+hydra  medusa  爆破工具  
+john 开膛手  破解hash的（shadow）
+ssh安全：
+1、密码尽可能强大 （大小写、数字、字母、特殊符号、短语、长度最好14位以上）
+2、修改默认端口号
+[root@centos7 ~]# vim /etc/ssh/sshd_config 
+3、禁止root登录
+4、查看日志  /var/log/btmp   这个日志记录了登录失败的信息，如果文件大小不断被放大，可能被爆破
+5、fail2ban
+
+
+系统备份：
+完整备份：备份所有的数据，同时将备份过的文件的属性进行标记，标记为备份.缺点：备份的数据随着时间的增长，会越来越庞大，耗时会越来越长，资源利用高  优点：数据恢复次数少，任何时间段的数据一次恢复
+差异备份：只备份自上一次完全备份后增长的数据，对已经有备份标记的文件不进行备份（也不清楚标记属性），对自身备份的文件也不进行标记。缺点：备份的数据随着时间增长，越来越庞大，耗时越来越长。
+增量备份：备份自上一次（完全备份、差异备份、增量备份）之后有变化的数据。备份后的文件打上标记。
+优点：备份的数据量小，备份速度快，资源利用率低
+缺点：数据恢复的次数由备份的次数决定，恢复的次数较多
+
+一个月做一次完全备份，每周做一次差异备份，每天做一次增量备份
+
+dump   专门用于针对ext日志式文件系统进行备份
+xfsdump  专门针对xfs日志式文件系统进行备份
+以上两个备份工具都是针对磁盘进行备份
+备份级别用数字表示，从0-9.
+0  完全备份
+从低往高表示增量备份
+从高往低表示差异备份
+
+[root@centos6 yy]# mkisofs -o winxp.iso *.dump winxp  
+制作镜像文件
+
+归档：cpio，也可以用来备份数据，这个工具自身并不知道需要备份的数据有哪些，一般都是和管理结合使用
+[root@centos6 yy]# find . -iname \*.dump | cpio -o > test.cpio
+参数o表示的打包，如果解包用i。
+[root@centos6 xx]# cpio -i  < test.cpio 
+解档
+   
+   2017/4/27  实时备份
+rsync （只传输差异变化） scp
+数据同步有两种方式：推 拉
+拉：从服务器端拉取数据，对服务器的开销很小，完全取决于客户端的操作，不能真正做到同步，非实时。传输速率慢
+推：服务器的开销大，但因为主动方是变化端，所以可以做到同步。
+rsync参数：
+-a  归档模式
+[root@centos7 xx]# rsync  -azP root@192.168.24.240:/tmp/xx vmware-root/ 
+从服务端拉取/tmp/xx目录下的所有文件
+
+inotify 是内核2.6以后自带的一个机制，提供了对文件的事件的监控，比如文件的修改，删除，添加，属性的调整。
+[root@centos7 tmp]# ll /proc/sys/fs/inotify/
+max_queued_events     最大的监控队列
+max_user_instances    最大的实例
+max_user_watches      每个用户实例最多监控的文件数量
+[root@centos7 tmp]# sysctl -p   将修改写入/etc/sysctl.conf文件中
+[root@centos7 tmp]# inotifywait -mrq -e move,create,delete,modify test/    对目录test产生的事件进行监控，事件有移动，创建，修改和删除。
+实时同步脚本：
+ 21 SRC=/tmp/test/
+ 22 DST=root@c6:/tmp/xx
+ 23 inotifywait -mrq -e move,create,delete,modify ${SRC} |while read line 
+ 24 do
+ 25         rsync -azP --delete ${SRC} ${DST}
+ 26 done
+
+监控脚本
+ 19 pgrep minitor.sh
+ 20 if [  $? !=  0 ] ;then
+ 21          /tmp/test/minitor.sh
+ 22 fi 
+
+磁盘配额
+ntfs
+[root@centos6 tmp]# mount -o usrquota,grpquota /dev/sdb2  xx/
+磁盘配额功能必须在挂在前赋予
+[root@centos6 xx]# quotacheck -cug /dev/sdb2 
+创建基于用户和组的配额数据库
+[root@centos6 xx]# quotaon -u /dev/sdb2 
+针对用户激活配额功能 
+[root@centos6 xx]# warnquota   打开邮件告警功能
+
+
+
+
+
+
+
+
+
 
 
 
