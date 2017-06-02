@@ -1752,9 +1752,551 @@ ntfs
 [root@centos6 xx]# warnquota   打开邮件告警功能
 
 
+2017/05/02  RAID
+廉价磁盘冗余阵列   1987年 伯克利大学 
+优点：提高读写性能；容错性好；更有效的利用磁盘空间；提升服务器的整体性能
+
+硬阵列：hard   通过阵列卡实现
+软阵列：soft   通过软件实现
+lun 逻辑单元号：地址编号，系统通过这个编号可以找到相应的物理设备
+
+EMC NETAPP 华为  曙光（长虹）
+
+去I（ibm）O（oracle）E（emc）  sun mysql  java xfs 
+
+RAID0:将数据分块后按序写入各个磁盘。所有的I/O是平均分配给各个物理磁盘的，性能是所有阵列中最好的。缺点：一个硬盘的损坏，会导致所有数据的丢失，造成灾难性的故障。所有阵列中安全性最低，通常不建议使用。
+应用场景：需要高带宽的应用、图像编辑等
+
+RAID1：将两块硬盘当成一块硬盘使用。优点：对磁盘进行了冗余。缺点：磁盘利用率低。
+应用场景：财务、个人用户（金融）
+
+RAID4：至少需要三块磁盘才能实现。数据分别按序放入前两块磁盘中，第三块磁盘作为校验盘，对前两个磁盘中的数据进行校验并存放。所以第三块磁盘（校验盘）就是热点。
+
+RAID5：至少需要三块磁盘，采用分布式的校验，将校验盘平均分布在阵列组中的每块磁盘设备上，在相邻的条带间循环分布。优点：读写性能好，有冗余功能，磁盘利用率75%。缺点：同时两块硬盘损坏
+应用场景：服务器
+
+RAID6：最少需要4块硬盘实现。使用多种分布存储的校验方式实现，是raid5的一种扩展方式。通常都是带有两种校验方法。优点：可靠性高，允许多块硬盘故障。读性能好，写性能一般。缺点：磁盘利用率低于raid5。
+
+RAID10：先进行raid1，将raid1后的磁盘阵列后再进行raid0。优点：冗余性能好，写性能高于raid5，读性能好。缺点：磁盘利用率低，部署成本高。
+应用场景：适合有大量数据存储要求高速读写的场合
+
+实例：
+[root@centos6 ~]# cat /proc/mdstat   查看当前是否存在阵列
+[root@centos6 ~]# mdadm -C /dev/md0 -a yes -l 5 -n 3 -x 1 /dev/sd{b,c,d,e}
+参数C表示创建，-a表示是否启用标准化的名称（标准名称为md0等），-l表示使用哪种阵列，-n表示使用的硬盘数量，-x表示是否启用热备盘。
+[root@centos6 ~]# mdadm -D /dev/md0   查看阵列的属性，创建成功后会出现一块新的硬盘，名称按事先定义
+[root@centos6 ~]# mdadm -E /dev/sdb  查看某一块硬盘在阵列中的角色
+[root@centos6 test]# mdadm  /dev/md0 -f /dev/sdb  调试模拟阵列中的某一块硬盘故障
+[root@centos6 ~]# watch -n 0.5 'cat /proc/mdstat'  监控
+[root@centos6 test]# mdadm /dev/md0 -r /dev/sdb  将故障盘热移除
+[root@centos6 test]# mdadm /dev/md0 -a /dev/sdb  添加新的磁盘到阵列中
+删除阵列步骤
+[root@centos6 tmp]# umount /dev/md0   卸载使用中的阵列
+[root@centos6 tmp]# mdadm -S /dev/md0   停止阵列
+[root@centos6 tmp]# mdadm -A /dev/md0  /dev/sd{b,c,d,e}
+重新恢复阵列
+
+LVM逻辑卷
+只属于类unix系统
+
+pv  物理卷   查看物理命令：pvscan
+                         创建pv 命令：pvcreate /dev/md0p{1,2,3,4}      4块硬盘
+vg   卷组       查看卷组命令：vgscan
+                        创建卷组命令：vgcreate vg0（卷组名字）/dev/md0p{1,2,3}
+						如果使用参数-s 后面跟上PE大小
+                        PE    卷组的大小是由PE组成的，PE也是vg的最小单位，默认大小是4M
+						在有足够的物理卷时，添加卷组：vgextend vg0 /dev/md0p4 
+lv     逻辑卷  查看逻辑卷命令：lvscan 
+                         创建逻辑卷命令：lvcreate -n lv0 -L 1000M vg0 
+						 添加115个PE到lv0逻辑卷：          lvextend -l  +115 /dev/vg0/lv0            
+                          激活添加PE的命令：                 resize2fs  /dev/md
+					     
+						  lvreduce -l -265 /dev/v
+						  
+快照
+lvcreate -n sn(快照名字) -L 400M -s /dev/vg0/lv0
+mount /dev/vg0/sn test/   挂载快照，恢复数据
+lvremove -f /dev/vg0/sn     先卸载，再删除快照
+
+计划任务
+1.at   一次性任务  （atd守护进程） 
+at -l 查看计划任务
+at 05/06/2017
+at> reboot
+at><EOF>
+2017年5月6号重启
+
+at now + 12minutes
+at>poweroff
+at><EOF>
+
+at 10am tomorrow
+at>sad
+
+atrm 3 删除第三个计划任务
+
+计划任务
+1、at 一次性任务  （atd）
+at now + 12minutes 
+at 10am tomrrow
+at 6am + 3days
+vim /etc/at.allow
+vim /etc/at.deny 
+
+2017/05/07  
+crontab   周期性、循环往复执行的计划任务
+[root@centos6 ~]# crontab -l -u tom  查看特定用户是否存在计划任务
+[root@centos6 ~]# crontab -e  设置当前用户的计划任务
+[root@centos6 cron]# pwd     
+/var/spool/cron   这个目录下记录的就是用户的计划任务文件
+#分钟 小时  天    月     周    命令
+*      *     *     *      *    /usr/bin/echo hello
+#每天早晨7点执行一个
+0      7     *     *      *    /usr/bin/bash xx.sh
+#每个工作日凌晨2点执行脚本任务
+0      2     *     *     1-5   echo xxx
+#每天凌晨3点到3点半每隔5分钟执行一次任务
+0-30/5 3     *     *      *    echo xxx
+#在2月开始1号到10号以及15号每天9点45执行任务
+45     9  1-10,15  2      *    echo  xxx
+#凡是满31的月从1号到10号，以及15号的晚上8点25和非工作日执行
+25    20   1-10,15  1,3,5,7,8,10,12  6,7   echo xxx
+0     *    *    *    *   /etc/init.d/sshd restart
+
+[root@centos6 cron]# vim /etc/cron.deny   将tom用户放入黑名单，tom不再具备使用crontab的权限
+[jarry@centos6 ~]$ vim /etc/cron.allow  使用白名单，默认不存在，手动创建
+
+[root@centos6 ~]# cat /var/spool/anacron/cron.daily 
+查看最近一次哪一天执行的anacron
 
 
+Daemons 系统服务
+守护进程 
+独立的：每一个服务会自己监听自己的端口，比如web服务器就会有一个进程监听自身的80端口
+非对立：super daemon 通常都是由xinetd统一管理
+端口：/etc/service    1-1024以下都是常用端口
 
+[root@centos6 init.d]# yum install xinetd   安装xinetd，用它来管理其他的不具备守护进程的服务
+[root@centos6 init.d]# cd /etc/xinetd.d/   非独立服务存放路径
+每一个daemons都有一个配置文件，daemons的启动会根据配置文件中的设定来执行，所以每次修改完配置文件如果希望daemons按需求执行，需要重启服务。同样，xinted也是一个daemons，它的配置文件在/etc/xinetd.conf
+[root@centos6 ~]# vim /etc/xinetd.conf   配置xinetd
+
+      cps             = 50 10   同一秒内最多允许50个链接，如果超过，对外服务暂停10s
+        instances       = 50
+		同一个实例最大链接数50个
+        per_source      = 10
+同一个来源最多10个
+
+tcpwrapper防火墙
+[root@centos6 ~]#ls /etc/hosts.    
+hosts.allow  hosts.deny 
+allow提供的是白名单，deny提供的是黑名单
+in.telnetd: 192.168.24.4:spawn wall "xxxxxxxxx"  
+匹配成功后执行spawn后的指令
+
+in.telnetd: 192.168.24.4:twist wall "xxxxxxxxx"
+twist的语法不能放在allow名单中，因为twist是匹配成功后立即终止并执行twist后的指令
+
+
+日志服务器
+1.日志服务器
+rsyslog代替了syslog
+cat /var/log/dmesg
+cat /var/log/
+
+systemctl status 
+
+vim /etc/rsyslog.conf     日志服务器的主配置文件
+标准格式：
+事件.级别                        日志记录的位置
+
+
+事件分类：
+authpriv                和认证有关的事件  /var/log/secure 
+mail                      邮件系统有关的事件            
+cron                     计划任务有关的事件
+kern                     内核有关的事件
+syslog                  日志服务有关
+news                   新闻系统有关的事件
+uucp                   从一个系统拷贝到另一个系统有关的事件
+daemons            守护进程有关的事件
+local0-locacl7       用户自定义的事件
+
+级别：  由高往低
+emerg        恐慌级别   
+alert           紧急状态
+cirt             临界，有严重错误出现
+err             错误
+warning      警告
+notice          需要关注
+info             提供所有信息（正常消息）
+debug         开发者使用的调试级别
+显示所有级别使用*
+     *.info            /var/log/test.log 
+      .=              前面的事件必须等于后面的级别才记录日志
+	  .!               表示不等于，除了定义的级别以外的都记录
+	  mail,!err       mail事件除了err的级别都记录
+	  
+	  
+	  
+2017/05/09  日志服务器
+1、日志服务器
+rsyslog替代了syslog（默认集成）
+[root@centos6 ~]# cat /var/log/dmesg   查看内核启动
+[root@centos6 ~]# cat /var/log/maillog  查看邮件的日志
+[root@centos6 ~]# cat /var/log/messages  记录系统服务日志
+[root@centos6 ~]# cat /var/log/cron  显示所有计划任务的日志
+[root@centos6 ~]# cat /var/log/secure  查看用户登录信息
+[root@centos6 ~]# cat /var/log/btmp  记录所有登录失败的信息
+[root@centos7 ~]# systemctl restart rsyslog.service 
+
+日志服务器的配置
+[root@centos7 ~]# vim /etc/rsyslog.conf 
+标准格式：
+事件.级别                日志记录的位置            
+
+事件分类:
+authpriv   和认证有关的事件
+mail       邮件系统有关的事件
+cron       跟计划任务有关的事件
+kern       内核有关的
+syslog     日志服务有关
+news       跟新闻系统有关的事件
+daemons    跟守护进程有关的事件
+local0-local7    用户自定义事件
+
+级别：从高往低
+emerg  恐慌级别
+alert  紧急
+cirt   临界，有严重错误出现
+err    错误
+warning警告
+notice 需要关注
+info   提供所有信息（正常消息）
+debug  开发者使用的调试级别
+
+日志记录的规则
+*.info                    /var/log/test.log
+.=    前面的事件必须等于后面的级别才记录日志 
+.!    表示不等于，除了定义的级别以外的都记录
+
+[root@centos7 log]# vim /etc/rsyslog.conf   自定义日志
+local0.*                                 /var/log/ssh.log
+[root@centos7 log]# vim /etc/ssh/sshd_config   修改ssh的日志事件类型
+ 43 SyslogFacility local0
+重启服务生效
+
+日志的格式：
+May  9 19:09:07 centos7 sshd[14114]: Server listening on 0.0.0.0 port 22.
+datetime
+hostname
+server[pid]
+action
+
+[root@centos7 log]# tailf debug.log  实时查看日志
+[root@centos7 log]# journalctl  -p  emerg  只查看和恐慌级别有关的日志
+[root@centos7 log]# journalctl  --since today  只查看和今天有关的日志
+[root@centos7 log]# journalctl --since "2017-05-01" --until today
+查看特定时间段的日志
+  
+2、中央日志服务器
+客户端配置如下：@@表示tcp连接，@表示udp连接
+local5.debug             @@192.168.24.240:514
+服务器端开启：  如果修改默认的端口514，需要注意selinux
+$ModLoad imtcp
+$InputTCPServerRun 514
+
+3、日志备份
+
+/var/log/messages   当前日志
+一周  messages3 
+/var/log/messages  新的
+一周  messages2
+/var/log/messages  新的
+一周  messages1
+/var/log/messages  新的
+
+ logrotate   这个是系统预装的日志轮循工具
+[root@centos7 ~]# vim /etc/logrotate.conf   日志轮循配置文件
+ 35 /var/log/messages {     定义要求回滚的日志
+ 36     weekly          每一周轮循一次，可以用size=10M
+ 37     rotate 4        保留4份，第五份开始删除时间最久的那份
+ 38     compress        要求归档时用gzip压缩
+ 39     delaycompress   延时压缩，对当前的最近的要轮循的日志不压缩
+ 40     missingok       如果日志不存在忽略
+ 41     notifempty      如果日志为空不轮循
+ 42     create 0664 root root   轮循后生成新的日志
+ 43     postrotate       这个参数和endscript是一个整体，它们中间可以跟上指令，下面的指令表示在轮循完成后重启rsyrlog
+ 44         /usr/bin/killall -HUP rsyslog   
+ 45     endscript                
+ 46 }  
+
+4、日志分析
+AIDE    yum install aide  -y      
+aide  -i  
+aide  --check  
+logwatch  perl写的一个开源的日志分析工具，它主要是可以很方便的实现对日志的摘要，但它不是用来实时监控的。
+[root@centos7 ~]# vim /etc/logwatch/conf/logwatch.conf  主配置文件
+
+2017/05/11  网络配置
+NetworkManager  图形化网络管理daemons
+[root@centos6 ~]#  /etc/sysconfig/network-scripts/ifcfg-eth0   网卡的配置文件
+centos6中对服务的开启自动启动控制通过命令chkconfig
+[root@centos6 ~]# chkconfig --list  NetworkManager 
+查看这个daemons在什么级别下会自动启动
+[root@centos6 ~]# chkconfig NetworkManager off
+在当前级别下关闭此服务
+注：bash-completion 这个可以实现tab补全，系统最小化安装需要自己安装这个包
+centos7中设置服务开机不自动启动
+[root@centos7 ~]# systemctl disable  NetworkManager
+通过mask可以将服务锁住
+[root@centos7 ~]# systemctl mask  NetworkManager
+centos中命令行网络配置：
+[root@centos6 ~]# ifconfig lo 1.1.1.1 netmask 255.255.0.0 up
+[root@centos6 ~]# ip addr  查看网卡信息
+[root@centos6 ~]# ip link show lo
+查看网卡的二层信息
+[root@centos6 ~]# ip addr show lo
+查看网卡三层信息
+注：在centos7中，如果是最小化安装，默认是没有ifconfig指令的，只有ip addr。需要安装net-tools工具包
+[root@centos6 ~]# ifdown lo
+关闭网卡，开启使用ifup 
+[root@centos6 ~]# ip link set lo down
+二层关闭网卡
+[root@centos6 ~]# ip addr add 192.168.1.1/24 dev lo label lo:1
+配置一块网卡多个ip
+[root@centos6 ~]# ifconfig lo:2 192.168.3.3  netmask 255.255.255.0 up
+
+注：命令行下的所有操作都是临时有效，如果希望永久生效，需要修改配置文件
+[root@centos6 ~]# route add default gw 192.168.24.254
+添加网关
+
+[root@centos6 ~]# tcpdump -i eth0
+网卡抓包
+[root@centos6 ~]# tcpdump -i eth0 src host 192.168.24.4 and dst host 192.168.24.240 
+下载工具：wget、lrzsz
+dns查询：nslookup
+字符化浏览器：elinks
+
+rhel7命令行网络配置
+[root@centos7 ~]# nmcli connection show --active
+查看当前活跃的网卡所有名称信息
+[root@centos7 ~]# nmcli connection show eno16777736 
+查看网卡的所有信息
+
+
+[root@centos6 ~]# vim /etc/sysconfig/network
+修改主机名，配置文件中的修改事永久生效的
+[root@centos7 ~]# vim /etc/resolv.conf 
+设置dns信息
+[root@centos7 ~]# vim /etc/hosts
+本地解析
+
+桥接：
+[root@centos7 ~]# yum install bridge-utils bash-completion-extras -y
+安装桥接和补全工具
+[root@centos7 ~]# brctl show 
+查看当前的网桥设备
+[root@centos7 ~]#brctl addbr br0 添加一个名为br0的网桥设备
+[root@centos7 ~]#brctl addif br0 eno16777736 将物理网卡连接到网桥设备
+[root@centos7 network-scripts]# vim ifcfg-br0  修改网桥配置文件
+  1 TYPE=Bridge
+  4 NAME=br0
+  5 DEVICE=br0
+  6 ONBOOT=yes
+ 
+[root@centos7 network-scripts]# vim ifcfg-eno16777736  修改物理网卡配置，添加桥接功能
+  1 TYPE=Ethernet
+  2 BOOTPROTO=dchp
+  3 NAME=eno16777736
+  4 ONBOOT=yes
+  5 HWADDR=00:0C:29:6B:C0:3A
+  6 BRIDGE=br0
+
+  2017/05/16 链路聚合
+链路备份  activebackup
+负载均衡  loadbalance 
+轮循      roundrobin  
+[root@centos7 ~]# nmcli connection show  查看当前网卡的信息
+[root@centos7 ~]# nmcli connection add type team con-name  team0 ifname team0 config '{"runner":{"name":"loadbalance"}}'
+通过nmcli创建一块虚拟网卡，虚拟网卡的类型是链路聚合，名称是team0，然后通过json定义使用的模式是负载均衡
+[root@centos7 ~]# nmcli connection modify team0 ipv4.address ‘ip 网关 ’
+[root@centos7 network-scripts]# nmcli connection add type team-slave con-name team-port1 ifname eno16777736 master team0 
+定义类型为链路聚合组中的从设备类型，将名为eno16777736的网卡添加到主设备team0中，并生成名为team-port1的配置文件
+[root@centos7 ~]# teamdctl team0 state   查看链路聚合网卡的状态
+  1 NAME=team-port1
+  2 BOOTPROTO=none
+  3 DEVICE=eno16777736
+  4 ONBOOT=yes
+  5 TEAM_MASTER=team0
+  6 DEVICETYPE=TeamPort                    
+网络环境设置
+vim /etc/udev/rule.d/70-persistent-net.rules   这个文件定义了网络设备命令的规则以及相关的信息制定
+[root@a ~]# route add default gw 10.0.0.1  添加默认网关
+
+[root@b ~]# route add -net 30.0.0.0/24 dev eth1  添加路由，代表如果要去往目的30.0.0.0网段，数据包走eth1
+
+[root@c6 ~]# iptables -F 临时关闭防火墙
+[root@c7 ~]# firewall-cmd set-default-zones=trusted   放行所有
+
+如果希望配置永久生效
+开启ipv4转发
+[root@centos6 ~]# vim /etc/sysctl.conf 
+[root@centos6 ~]# sysctl -p  不重启生效
+[root@centos6 network-scripts]# vim route-eth1  配置路由永久生效
+30.0.0.0/24  via 20.0.0.2 dev eth1
+
+开源路由方案：openwrt、routeros
+
+2017/05/18
+防火墙:
+硬件防火墙--数据包过滤
+软件防火墙--tcpwrapper\iptables\ebtables\firewalld
+
+包过滤防火墙技术：在网络层对数据包进行筛选（过滤），通过ACL。
+代理服务防火墙技术，典型的就是链路级的网关。反向代理技术就是如此，典型的应用就是Nginx。
+
+linux内核级别直接实现防火墙功能。
+iptables就是依赖的netfilter
+rhel7中使用的firewalld依然依赖的是netfilter，但是管理工具使用firewall-cmd
+
+iptables直接由内核驱动运行，编写规则也是从上往下，并且一旦匹配某一条目，就不再往下匹配，不同服务之间规则互不影响。
+iptables 表（table）
+表分为filter表和nat表
+[root@centos6 ~]# iptables -t nat -L -n  查看nat表的规则。参数t是table的意思，参数L是列表的意思。参数n是禁止反向解析。
+[root@centos6 ~]# iptables  -L -n
+不指明查看的表，默认就是filter表。
+
+iptables 链（chain）
+filter表的三条链：
+INPUT    进入的数据
+FORWARD  转发的数据
+OUTPUT   出去的数据
+nat表的三条链：
+PREROUTING  目的地址转换
+POSTROUTING  源地址转换
+OUTPUT   防火墙自身访问时是否转换
+
+iptables中filter表的语法：
+[root@centos6 ~]# iptables -t filter  \
+> -A|D|I   \   添加|删除|插入
+> INPUT|OUTPUT|FORWARD      \ 指定链
+> -p tcp|udp|icmp    \ 指定协议
+> -s 1.1.1.1/24   -d 2.2.2.2/24  \
+源地址和目的地址
+> --sport m:n --dport m:n   \
+源端口和目的端口
+> -j ACCEPT|REJECT|DROP|LOG  执行动作，允许|拒绝|丢弃|记录
+
+
+rhel7--firewalld
+rhel7中默认开启的是firewalld，另外还可以使用iptables，或者ebtables。
+为了防火墙之间的冲突，将不使用的彻底禁用。
+[rot@rhel7 ~]# systemctl stop ebtables.service  关闭ebtables
+[rot@rhel7 ~]# systemctl disable ebtables.service   禁止开机启动
+[root@rhel7 ~]# systemctl mask ebtables.service   禁用ebtables
+
+firewalld 有两种状态，一种是runtime，一种是permanent。runtime是默认状态，在这个状态下做的设置，立即生效，但服务或服务器一旦重启，失效。
+permanent状态是永久生效的，但在这个状态下做的配置必须在服务或者服务器重启后才会永久生效。
+
+firewall的中添加了区域的概念：
+drop区域提供最严格的策略，丢弃所有
+block区域提供和drop一样的策略，但是会给出提示信息
+trusted区域提供最宽松的策略，放行所有
+public是默认的策略
+针对不同的区域提供不同的默认策略，可以针对services（具体服务）、ports端口、nat、端口映射、icmp过滤以及富规则进行设置。
+[root@rhel7 ~]# firewall-cmd --set-default-zone=public 
+设置默认区域
+[root@rhel7 ~]# firewall-cmd --get-default-zone 
+查看当前默认区域
+
+[root@rhel7 ~]# firewall-cmd  --add-rich-rule='rule family=ipv4 service name=vnc-server source address=1.1.1.1 reject'
+添加富规则
+[root@rhel7 ~]# firewall-cmd --add-forward-port port=80:proto=tcp:toaddr=20.0.0.2:toport=80
+添加端口转发
+
+
+通过gnupg加密保护文件
+10101010101   
+01010101010
+abcdefghijklmopqrstuvwxyz
+ abcdefghijklmopqrstuvwxyz
+ 
+对称加密：DES、3DES、AES、RC5
+原始数据：01000001
+公    钥：10101010
+XOR运算： 00010100
+优点：快，加密效率高，解密性能好
+缺点：密钥配送问题，如果安全传递公钥
+典型应用：wep
+
+非对称加密：RSA
+rsa  公钥  私钥
+密文=明文的E次方除以N，得到的余数就是密文
+明文=密文的D次方除以N，得到的余数就是明文
+以上公式中E和N的结合就是公钥，D和N的结合就是私钥。
+n=q*p  
+l=（-1，p-1）
+ECC 比RSA的密钥长度更短，但是安全性更高。
+应用场景：ssh  https  
+优点：安全性高
+缺点：性能差，开销很大，存在中间人攻击。
+
+混合算法：对称+非对称
+对称加密算法加密消息
+用非对称算法传递对称加密算法中的会话密钥
+
+数字签名
+单向散列函数 md5  sha1 sha256 sha512
+消息认证码MAC：
+发送方和接收方预共享密钥
+发送发加密预共享密钥（用消息认证码加密）
+接收方收到后也进行同样操作，并对比两人的结果是否一致
+
+数字签名过程：公钥和私钥
+发送方用单向散列函数加密消息
+发送方对私钥对得到的散列值加密，最终得到签名
+接收方用发送方的公钥对签名进行解密
+接收方将解密后的散列和发送方发送的消息进行比对
+
+[root@centos6 ~]# cd ~/.gnupg/
+这个目录下存放了公钥和私钥
+
+2017/05/25
+BOOTPROTO--DHCP 
+使用UDP协议通信，端口是67和68
+dhcp discovery  客户端向服务器端发起的，用于查询dhcp服务器的位置，服务器端的67号端口用来监听此类包
+dchp offer 是服务器端通过68号端口向客户端发起的响应
+dchp request 是客户端向服务器端发起的请求，要求确认使用具体的ip等信息的。使用广播方式，如果存在其他的dhcp服务器，在收到这个广播包后，知道客户端已经选择了dhcp，会撤回前面发出的offer的信息。
+dhcpack 这个是服务器端对客户端的信息的请求的回复。
+dhcpnak  服务端发送给客户端，通常是因为地址过期或者无效
+dchpdecline  客户端发送给服务器端，通常是地址被占用
+dchpinfrom  客户端向服务器端申请参数
+
+[root@centos6 ~]# yum install dhcp -y  安装dhcp服务
+[root@centos6 ~]# iptables -I INPUT 1 -p udp --dport 67 -j ACCEPT
+[root@centos6 ~]# iptables -I INPUT 1 -p udp --dport 68 -j ACCEPT
+[root@centos6 ~]# service iptables save
+[root@centos6 ~]# cp /usr/share/doc/dhcp-4.1.1/dhcpd.conf.sample /etc/dhcp/dhcpd.conf   生成配置文件
+作用域格式：
+subnet ip netmask {       
+ 中间写这个作用域的信息  
+   }
+
+[root@centos6 ~]# cat /var/lib/dhclient/dhclient-eth0.leases  在客户端上可以查看dhcp的租约等数据信息
+
+
+超级作用域格式：
+shared-network 11-22 {
+	subnetsubnet ip netmask {       
+ 中间写这个作用域的信息  
+   } 
+   subnet ip netmask {       
+ 中间写这个作用域的信息  
+   }
+   subnet ip netmask {       
+ 中间写这个作用域的信息  1
+  
 
 
 
