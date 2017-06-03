@@ -2286,25 +2286,6 @@ subnet ip netmask {
 [root@centos6 ~]# cat /var/lib/dhclient/dhclient-eth0.leases  在客户端上可以查看dhcp的租约等数据信息
 
 
-超级作用域格式：
-shared-network 11-22 {
-	subnetsubnet ip netmask {       
- 中间写这个作用域的信息  
-   } 
-   subnet ip netmask {       
- 中间写这个作用域的信息  
-   }
-   subnet ip netmask {       
- 中间写这个作用域的信息  1
-  
-
-
-
-
-
-
-
-
 
 
 
