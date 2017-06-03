@@ -1,0 +1,6 @@
+sudo apt-get update
+sudo apt-get upgrade 
+
+修改hosts后生效方法：
+sudo systemctl restart NetworkManage     √
+$sudo /etc/init.d/networking restart    
